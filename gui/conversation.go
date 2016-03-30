@@ -30,6 +30,7 @@ type conversationView interface {
 	displayNotificationVerifiedOrNot(notificationV, notificationNV string)
 	setEnabled(enabled bool)
 	isVisible() bool
+	formatMessage(form string, message []byte, outgoing bool) []taggableText
 }
 
 type conversationWindow struct {
@@ -581,19 +582,33 @@ func (conv *conversationPane) appendStatus(from string, timestamp time.Time, sho
 	conv.appendToHistory(timestamp, taggableText{"statusText", createStatusMessage(from, show, showStatus, gone)})
 }
 
-func (conv *conversationPane) appendMessage(from string, timestamp time.Time, encrypted bool, message []byte, outgoing bool) {
-	conv.appendToHistory(timestamp,
-		taggableText{
+const mePrefix = "/me "
+
+func (con *conversationPane) formatMessage(from string, message []byte, outgoing bool) []taggableText {
+	arHist := []taggableText{}
+	sep := ":  "
+	if string(message[:len(mePrefix)]) == mePrefix {
+		sep = " "
+		message = message[len(mePrefix):]
+		arHist = append(arHist, taggableText{
 			is(outgoing, "outgoingUser", "incomingUser"),
+			"* ",
+		})
+	}
+
+	return append(arHist, []taggableText{
+		{is(outgoing, "outgoingUser", "incomingUser"),
 			from,
 		},
-		taggableText{
-			text: ":  ",
-		},
-		taggableText{
-			is(outgoing, "outgoingText", "incomingText"),
+		{text: sep},
+		{is(outgoing, "outgoingText", "incomingText"),
 			string(message),
-		})
+		},
+	}...)
+}
+
+func (conv *conversationPane) appendMessage(from string, timestamp time.Time, encrypted bool, message []byte, outgoing bool) {
+	conv.appendToHistory(timestamp, conv.formatMessage(from, message, outgoing)...)
 }
 
 func (conv *conversationPane) displayNotification(notification string) {
